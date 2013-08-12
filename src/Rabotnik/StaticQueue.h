@@ -42,7 +42,7 @@ namespace Rabotnik
         }
 #endif
         
-        return *m_writePointer++;
+        return *new (m_writePointer++) _T();
       }
       
       void push_back(const _T & value)
@@ -53,7 +53,7 @@ namespace Rabotnik
           throw Exception("Overflow in _T & StaticQueueWriter::push_back().");
         }
 #endif
-        *m_writePointer++ = value;
+        new (m_writePointer++) _T(value);
       }
 
       _T * const getWritePointer() const { return m_writePointer; }
@@ -61,15 +61,11 @@ namespace Rabotnik
 
   /**
    * @brief Statically allocated queue.
-   *
-   * Allocates the message buffer using the default constructor.
-   * Popping does not call destructor. That is, this class is usually suitable
-   * only for storing pure data objects.
    */
   template<typename _T, size_t _NumItems>
   class StaticQueue : boost::noncopyable
   {
-    _T m_queue[_NumItems];
+    char m_queue[_NumItems * sizeof(_T)];
     _T * m_writePointer;
 
     public:
@@ -77,28 +73,28 @@ namespace Rabotnik
       typedef const _T * const_iterator;
 
       StaticQueue()
-        : m_writePointer(&m_queue[0])
+        : m_writePointer(reinterpret_cast<_T*>(&m_queue[0]))
       {
       }
 
       const_iterator begin() const
       {
-        return &m_queue[0];
+        return reinterpret_cast<const_iterator>(&m_queue[0]);
       }
 
       iterator begin()
       {
-        return &m_queue[0];
+        return reinterpret_cast<iterator>(&m_queue[0]);
       }
 
       const_iterator end() const
       {
-        return m_writePointer;
+        return reinterpret_cast<const_iterator>(m_writePointer);
       }
 
       iterator end()
       {
-        return m_writePointer;
+        return reinterpret_cast<iterator>(m_writePointer);
       }
 
       /**
@@ -107,12 +103,14 @@ namespace Rabotnik
       void push_back(const _T & item)
       {
 #ifndef RABOTNIK_UNCHECKED
-        if (m_writePointer >= &m_queue[_NumItems])
+        if (m_writePointer 
+            >= reinterpret_cast<_T*>(&m_queue[_NumItems * sizeof(_T)]))
         {
-          throw Exception("Overflow in void StaticQueue::push_back(const _T &).");
+          throw Exception(
+              "Overflow in void StaticQueue::push_back(const _T &).");
         }
 #endif
-        *m_writePointer++ = item;
+        new (m_writePointer++) _T(item);
       }
 
       /**
@@ -122,21 +120,31 @@ namespace Rabotnik
       _T & push_back()
       {
 #ifndef RABOTNIK_UNCHECKED
-        if (m_writePointer >= &m_queue[_NumItems])
+        if (m_writePointer 
+            >= reinterpret_cast<_T*>(&m_queue[_NumItems * sizeof(_T)]))
         {
           throw Exception("Overflow in _T & StaticQueue::push_back().");
         }
 #endif
-        return *m_writePointer++;
+        return *new (m_writePointer++) _T();
       }
 
       size_t length() const
       {
-        return m_writePointer - &m_queue[0];
+        return m_writePointer - begin();
       }
 
-      void clear() {
-        m_writePointer = &m_queue[0];
+      void clear() 
+      {
+        if (m_writePointer != begin())
+        {
+          do
+          {
+            --m_writePointer;
+            m_writePointer->~_T();
+          }
+          while (m_writePointer != begin());
+        }
       }
 
       /**
@@ -161,6 +169,12 @@ namespace Rabotnik
       }
 
       /** @} */
+
+
+      ~StaticQueue()
+      {
+        clear();
+      }
   };
 }
 
