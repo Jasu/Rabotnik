@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/type_traits.hpp>
+#include <boost/type_traits/integral_constant.hpp>
 
 /**
  * @brief Makes a template<_T, _Sign> class HasMemberFunction_functionName.
