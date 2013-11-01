@@ -13,5 +13,10 @@ namespace Rabotnik
         : m_what(what)
       {
       }
+
+      const char * what() const throw()
+      {
+        return m_what;
+      }
   };
 }
