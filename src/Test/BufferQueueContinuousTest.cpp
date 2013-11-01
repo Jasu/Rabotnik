@@ -5,6 +5,9 @@
 #include <cstdlib>
 #include <unistd.h>
 
+//Hack to get around getpagesize() working on iOS SDK where it is deprecated
+//and removed when _POSIX_SOURCE is defined. It is required by thread.hpp.
+extern "C" { int getpagesize(); }
 #include <boost/thread.hpp>
 #include <boost/foreach.hpp>
 

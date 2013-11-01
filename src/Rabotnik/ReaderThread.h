@@ -5,6 +5,10 @@
 
 #include <boost/utility.hpp>
 #include <boost/bind.hpp>
+//Hack to get around getpagesize() working on iOS SDK where it is deprecated
+//and removed when _POSIX_SOURCE is defined. It is required by thread.hpp.
+extern "C" { int getpagesize(); }
+
 #include <boost/thread.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 
