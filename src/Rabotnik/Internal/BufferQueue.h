@@ -11,10 +11,11 @@ namespace Rabotnik
     {
       BOOST_CONCEPT_USAGE(BufferQueueConceptCheck)
       {
+        void dummy_to_prevent_warnings(typename _BufferQueue::buffer & bw);
         _BufferQueue q;
-        typename _BufferQueue::buffer & bw = q.beginWriting();
+        dummy_to_prevent_warnings(q.beginWriting());
         q.finishWriting();
-        typename _BufferQueue::buffer & br = q.beginReading();
+        dummy_to_prevent_warnings(q.beginReading());
         q.finishReading();
       }
     };
