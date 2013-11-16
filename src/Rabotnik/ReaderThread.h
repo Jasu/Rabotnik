@@ -134,6 +134,27 @@ namespace Rabotnik
           }
         }
       }
+
+      ~ReaderThread() 
+      {
+        switch (m_state)
+        {
+          case READER_THREAD_STATE_STARTING:
+            waitForState(READER_THREAD_STATE_RUNNING);
+            stop();
+            join();
+            break;
+          case READER_THREAD_STATE_RUNNING:
+            stop();
+            join();
+            break;
+          case READER_THREAD_STATE_STOPPING:
+            join();
+            break;
+          default:
+            break;
+        }
+      }
   };
 }
 
