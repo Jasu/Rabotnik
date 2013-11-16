@@ -18,6 +18,18 @@ namespace Rabotnik
     HAS_MEMBER_FUNCTION(processBuffer);
 
     template<typename _BufferHandler>
+    typename boost::enable_if<
+      typename HasMemberFunction_initializeThread<
+        _BufferHandler, 
+        void (_BufferHandler::*)()
+      >::type
+    >::type
+    callInitializeThread(_BufferHandler & bufferHandler)
+    {
+      bufferHandler.initializeThread();
+    }
+
+    template<typename _BufferHandler>
     typename boost::disable_if<
       typename HasMemberFunction_initializeThread<
         _BufferHandler, 
