@@ -12,6 +12,14 @@ extern "C" { int getpagesize(); }
 
 namespace Rabotnik
 {
+
+  enum ReaderThreadState {
+    READER_THREAD_STATE_STOPPED,
+    READER_THREAD_STATE_STARTING,
+    READER_THREAD_STATE_RUNNING,
+    READER_THREAD_STATE_STOPPING,
+  };
+
   /**
    * @brief Thread which handles buffers.
    *
@@ -33,21 +41,32 @@ namespace Rabotnik
 
     _BufferHandler m_handler;
 
-    bool m_isRunning;
+    ReaderThreadState m_state;
+
+    mutable boost::mutex m_stateMutex;
+
+    mutable boost::condition_variable m_stateCond;
 
     Internal::ProcessBufferCaller<_BufferHandler, buffer> m_processBufferCaller;
 
+    void setState(ReaderThreadState state)
+    {
+      boost::unique_lock<boost::mutex> lock(m_stateMutex);
+      m_state = state;
+    }
+
     void threadLoop()
     {
-      m_isRunning = true;
       Internal::callInitializeThread(m_handler);
-      while (m_isRunning)
+      setState(READER_THREAD_STATE_RUNNING);
+      while (m_state == READER_THREAD_STATE_RUNNING)
       {
         buffer & buffer = m_bufferQueue.beginReading();
         m_processBufferCaller.call(m_handler, buffer);
         m_bufferQueue.finishReading();
       }
       Internal::callUninitializeThread(m_handler);
+      setState(READER_THREAD_STATE_STOPPED);
     }
 
     /**
@@ -69,19 +88,24 @@ namespace Rabotnik
       buffer & beginWriting() { return m_bufferQueue.beginWriting(); }
       void finishWriting() { m_bufferQueue.finishWriting(); }
 
+      ReaderThread()
+        : m_state(READER_THREAD_STATE_STOPPED)
+      {
+      }
+
       void start()
       {
-        if (m_isRunning)
+        if (m_state != READER_THREAD_STATE_STOPPED)
         {
-          throw Exception("The thread is already running.");
+          throw Exception("The thread is not stopped.");
         }
-        m_isRunning = true;
+        setState(READER_THREAD_STATE_STARTING);
         m_thread = boost::thread(boost::bind(&ReaderThread::threadLoop, this));
       }
 
       void stop()
       {
-        m_isRunning = false;
+        setState(READER_THREAD_STATE_STOPPING);
       }
 
       void join()
@@ -97,6 +121,18 @@ namespace Rabotnik
       const _BufferHandler & getBufferHandler() const
       {
         return m_handler;
+      }
+
+      void waitForState(ReaderThreadState state) const
+      {
+        if (m_state != state)
+        {
+          boost::unique_lock<boost::mutex> lock(m_stateMutex);
+          while(m_state != state)
+          {
+            m_stateCond.wait(lock);
+          }
+        }
       }
   };
 }
