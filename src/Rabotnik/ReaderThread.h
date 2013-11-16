@@ -27,6 +27,7 @@ namespace Rabotnik
    *  Type to handle the events. Contained within the ReaderThread.
    *  Must have void processBuffer() or void processBuffer(unsigned int microsecondsFromLastCall).
    *  May have void initializeThread() and/or void uninitializeThread().
+   *  Interruption pointsin processBuffer() may throw.
    */
   template<
     typename _BufferQueue, 
@@ -61,9 +62,19 @@ namespace Rabotnik
       setState(READER_THREAD_STATE_RUNNING);
       while (m_state == READER_THREAD_STATE_RUNNING)
       {
-        buffer & buffer = m_bufferQueue.beginReading();
-        m_processBufferCaller.call(m_handler, buffer);
-        m_bufferQueue.finishReading();
+        try 
+        {
+          buffer & buffer = m_bufferQueue.beginReading();
+          {
+            boost::this_thread::disable_interruption di;
+            m_processBufferCaller.call(m_handler, buffer);
+            m_bufferQueue.finishReading();
+          }
+        }
+        catch (const boost::thread_interrupted & e)
+        {
+        }
+
       }
       Internal::callUninitializeThread(m_handler);
       setState(READER_THREAD_STATE_STOPPED);
@@ -106,6 +117,13 @@ namespace Rabotnik
       void stop()
       {
         setState(READER_THREAD_STATE_STOPPING);
+      }
+
+
+      void interrupt()
+      {
+        setState(READER_THREAD_STATE_STOPPING);
+        m_thread.interrupt();
       }
 
       void join()
