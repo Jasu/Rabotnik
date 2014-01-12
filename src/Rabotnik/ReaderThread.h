@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Rabotnik/Internal/Callers.h>
+#include <Rabotnik/Internal/StateManager.h>
 #include <Rabotnik/Exception.h>
 
 #include <boost/bind.hpp>
@@ -12,14 +13,6 @@ extern "C" { int getpagesize(); }
 
 namespace Rabotnik
 {
-
-  enum ReaderThreadState {
-    READER_THREAD_STATE_STOPPED,
-    READER_THREAD_STATE_STARTING,
-    READER_THREAD_STATE_RUNNING,
-    READER_THREAD_STATE_STOPPING,
-  };
-
   /**
    * @brief Thread which handles buffers.
    *
@@ -42,25 +35,15 @@ namespace Rabotnik
 
     _BufferHandler m_handler;
 
-    ReaderThreadState m_state;
-
-    mutable boost::mutex m_stateMutex;
-
-    mutable boost::condition_variable m_stateCond;
+    Internal::StateManager m_stateManager;
 
     Internal::ProcessBufferCaller<_BufferHandler, buffer> m_processBufferCaller;
-
-    void setState(ReaderThreadState state)
-    {
-      boost::unique_lock<boost::mutex> lock(m_stateMutex);
-      m_state = state;
-    }
 
     void threadLoop()
     {
       Internal::callInitializeThread(m_handler);
-      setState(READER_THREAD_STATE_RUNNING);
-      while (m_state == READER_THREAD_STATE_RUNNING)
+      m_stateManager.setState(READER_STATE_RUNNING);
+      while (m_stateManager.getState() == READER_STATE_RUNNING)
       {
         try 
         {
@@ -77,7 +60,7 @@ namespace Rabotnik
 
       }
       Internal::callUninitializeThread(m_handler);
-      setState(READER_THREAD_STATE_STOPPED);
+      m_stateManager.setState(READER_STATE_STOPPED);
     }
 
     /**
@@ -99,30 +82,25 @@ namespace Rabotnik
       buffer & beginWriting() { return m_bufferQueue.beginWriting(); }
       void finishWriting() { m_bufferQueue.finishWriting(); }
 
-      ReaderThread()
-        : m_state(READER_THREAD_STATE_STOPPED)
-      {
-      }
-
       void start()
       {
-        if (m_state != READER_THREAD_STATE_STOPPED)
+        if (m_stateManager.getState() != READER_STATE_STOPPED)
         {
           throw Exception("The thread is not stopped.");
         }
-        setState(READER_THREAD_STATE_STARTING);
+        m_stateManager.setState(READER_STATE_STARTING);
         m_thread = boost::thread(boost::bind(&ReaderThread::threadLoop, this));
       }
 
       void stop()
       {
-        setState(READER_THREAD_STATE_STOPPING);
+        m_stateManager.setState(READER_STATE_STOPPING);
       }
 
 
       void interrupt()
       {
-        setState(READER_THREAD_STATE_STOPPING);
+        m_stateManager.setState(READER_STATE_STOPPING);
         m_thread.interrupt();
       }
 
@@ -141,32 +119,25 @@ namespace Rabotnik
         return m_handler;
       }
 
-      void waitForState(ReaderThreadState state) const
+      void waitForState(ReaderState state) const
       {
-        if (m_state != state)
-        {
-          boost::unique_lock<boost::mutex> lock(m_stateMutex);
-          while(m_state != state)
-          {
-            m_stateCond.wait(lock);
-          }
-        }
+        m_stateManager.waitForState(state);
       }
 
       ~ReaderThread() 
       {
-        switch (m_state)
+        switch (m_stateManager.getState())
         {
-          case READER_THREAD_STATE_STARTING:
-            waitForState(READER_THREAD_STATE_RUNNING);
+          case READER_STATE_STARTING:
+            waitForState(READER_STATE_RUNNING);
             stop();
             join();
             break;
-          case READER_THREAD_STATE_RUNNING:
+          case READER_STATE_RUNNING:
             stop();
             join();
             break;
-          case READER_THREAD_STATE_STOPPING:
+          case READER_STATE_STOPPING:
             join();
             break;
           default:
