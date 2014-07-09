@@ -124,6 +124,57 @@ namespace Rabotnik
         m_stateManager.waitForState(state);
       }
 
+      /**
+       * @todo Enable this CTOR with template magic iff handler has default 
+       * ctor.
+       */
+      ReaderThread()
+      {
+      }
+
+      /**
+       * @param arg1 Passed tot the handler constructor.
+       */
+      template<typename _Arg1>
+      ReaderThread(_Arg1 arg1) 
+        : m_handler(arg1)
+      {
+      }
+
+      /**
+       * @param arg1 Passed tot the handler constructor.
+       * @param arg2 Passed tot the handler constructor.
+       */
+      template<typename _Arg1, typename _Arg2>
+      ReaderThread(_Arg1 arg1, _Arg2 arg2)
+        : m_handler(arg1, arg2)
+      {
+      }
+
+      /**
+       * @param arg1 Passed tot the handler constructor.
+       * @param arg2 Passed tot the handler constructor.
+       * @param arg3 Passed tot the handler constructor.
+       */
+      template<typename _Arg1, typename _Arg2, typename _Arg3>
+      ReaderThread(_Arg1 arg1, _Arg2 arg2, _Arg3 arg3)
+        : m_handler(arg1, arg2, arg3)
+      {
+      }
+
+      /**
+       * @param arg1 Passed tot the handler constructor.
+       * @param arg2 Passed tot the handler constructor.
+       * @param arg3 Passed tot the handler constructor.
+       * @param arg4 Passed tot the handler constructor.
+       */
+      template<typename _Arg1, typename _Arg2, typename _Arg3, typename _Arg4>
+      ReaderThread(_Arg1 arg1, _Arg2 arg2, _Arg3 arg3, _Arg4 arg4)
+        : m_handler(arg1, arg2, arg3, arg4)
+      {
+      }
+
+
       ~ReaderThread() 
       {
         switch (m_stateManager.getState())
